@@ -55,13 +55,39 @@ scaffold-game \
 
 產出後自動跑 `go mod tidy && go build ./...`；全綠才成功。
 
-## 之後怎麼開工
+## 之後怎麼開工（5 分鐘從零到 push）
 
-1. 進 `<out-dir>` → `git init -b main`
-2. 在 GitHub 建你的新 repo（`gh repo create ...`）
-3. `git push -u origin main`
-4. 編輯 `internal/logic/logic.go`，實作 5 個 `GameLogic` hook
-5. 本機跑 `make run`（需主 monorepo 的 infra 與 tx/record 服務起來）
+```bash
+# ① Scaffold
+scaffold-game \
+  --game-id=niuniu \
+  --module=github.com/acme/club-game-niuniu \
+  --out-dir=./club-game-niuniu
+
+# ② 切進新 repo 並 git init
+cd club-game-niuniu
+git init -b main
+git add .
+git commit -m "chore: bootstrap from scaffold-game"
+
+# ③ 建 GitHub repo 並 push（gh CLI 或手動皆可）
+gh repo create acme/club-game-niuniu --private --source=. --remote=origin --push
+
+# ④ 跑測試驗證骨架 OK
+make test
+make build              # 產出 bin/game-niuniu
+
+# ⑤ 編輯 internal/logic/logic.go，實作 5 個 GameLogic hook：
+#    OnCreateRoom / OnEnterRoom / OnPlaceBet / OnSettle / OnTick
+#    每個 hook 的生命週期契約見：
+#    https://pkg.go.dev/github.com/game-dev-zone/pkg-game-framework/framework
+
+# ⑥ 本機跑（需對接 Consul / tx / record；通常由主團隊提供 dev endpoint）
+export CONSUL_ADDR=<dev-consul>
+export TX_SERVICE_NAME=tx
+export RECORD_SERVICE_NAME=record
+make run
+```
 
 詳細遊戲開發指南見主 monorepo 的 `docs/game-developer-guide.md`（scaffold 產出的 README 有連結）。
 
