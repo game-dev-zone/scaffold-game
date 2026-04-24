@@ -1,0 +1,85 @@
+// Package logic 實作 {{.GameID}} 的 GameLogic。
+//
+// 生命週期回顧（詳見 docs/game-framework-api.md）：
+//
+//	CreateRoom → 框架建 room → 框架 Tx.FREEZE（若 OwnerStake > 0） → OnCreateRoom
+//	EnterRoom  → room.Enter（加座位 + 廣播 snapshot） → OnEnterRoom
+//	PlaceBet   → 框架 Tx.BET → room.PlaceBet（更新 stake + 廣播 state） → OnPlaceBet
+//	Settle     → room.Settle（SETTLING + 廣播） → OnSettle（回傳 Payouts）
+//	             → 框架 Tx.Transfer（WIN/LOSS） → BroadcastPayout → Record.Write
+//
+// 回傳 error 會觸發補償；詳見各 hook 註解。
+package logic
+
+import (
+	gamev1 "github.com/club8/pkg-proto/gen/go/club/game/v1"
+	"github.com/club8/pkg-game-framework/framework"
+	"github.com/club8/pkg-game-framework/room"
+)
+
+// Logic 實作 framework.GameLogic。
+// TODO: 加上你自己需要的欄位（如 RNG seed、規則表、外部服務 client）。
+type Logic struct{}
+
+func (l *Logic) Meta() framework.GameMeta {
+	return framework.GameMeta{
+		GameID:       "{{.GameID}}",
+		DefaultSeats: 3, // TODO: 調成你遊戲的預設座位數
+		// TickInterval: 2 * time.Second, // 啟用 OnTick 時取消註解
+	}
+}
+
+// OnCreateRoom 在框架建 room 並（選擇性）凍結莊家押金後呼叫。
+// 回傳 error 框架會 UNFREEZE 並移除 room。
+func (l *Logic) OnCreateRoom(_ framework.Context, _ *gamev1.CreateRoomRequest, _ *room.Room) error {
+	// TODO: 初始化本局遊戲狀態（發牌、洗牌、座位分配）；
+	// 可用 room.WithGameState(fn) 在鎖內安全寫入 game-specific fields。
+	return nil
+}
+
+// OnEnterRoom 在 room.Enter 成功後呼叫。
+// 回傳 error 不會回退座位；由呼叫端處理。
+func (l *Logic) OnEnterRoom(_ framework.Context, _ *gamev1.EnterRoomRequest, _ *room.Room) error {
+	return nil
+}
+
+// OnPlaceBet 在框架 Tx.BET + room.PlaceBet 成功後呼叫。
+// 回傳 error 框架會：room.RefundBet → Tx.REFUND（補償）。
+//
+// req.Extra 是遊戲自訂 bytes（例如出牌序列、倍率選擇）。
+func (l *Logic) OnPlaceBet(_ framework.Context, _ *gamev1.PlaceBetRequest, _ *room.Room) error {
+	// TODO: 解析 req.Extra、驗證手牌合法性、更新出牌歷史。
+	return nil
+}
+
+// OnSettle 計算本局結算，回傳每個 user 的資金變動 Payouts。
+//
+// 規則：
+//   - Delta > 0：玩家贏（框架寫 Tx.SETTLE_WIN）
+//   - Delta < 0：玩家輸（框架寫 Tx.SETTLE_LOSS）
+//   - Delta == 0：略過不寫 Tx
+//
+// 所有 Payouts 在同一個 Tx.Transfer 內原子提交。
+// 之後框架會背景寫 Record（2 秒超時）並廣播 Payout 給訂閱者。
+func (l *Logic) OnSettle(_ framework.Context, req *gamev1.SettleRequest, r *room.Room) ([]*gamev1.Payout, error) {
+	// TODO: 根據牌型/規則計算勝負 —— 以下為範本：把 stake 原路退回（流局）。
+	stakes := r.SeatStakes()
+	payouts := make([]*gamev1.Payout, 0, len(stakes))
+	for userID, stake := range stakes {
+		if stake == 0 {
+			continue
+		}
+		payouts = append(payouts, &gamev1.Payout{
+			UserId: userID,
+			Delta:  stake,
+			Reason: "{{.GameID}}: template (refund)",
+		})
+	}
+	return payouts, nil
+}
+
+// OnTick 若 Meta().TickInterval > 0 時，框架會依該間隔對每個 Room 呼叫。
+// 回傳 error 會觸發 room 關閉。用於計時器 / 動畫驅動。
+func (l *Logic) OnTick(_ framework.Context, _ *room.Room) error {
+	return nil
+}

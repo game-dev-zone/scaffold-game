@@ -1,0 +1,59 @@
+package logic
+
+import (
+	"context"
+	"testing"
+
+	gamev1 "github.com/club8/pkg-proto/gen/go/club/game/v1"
+	recordv1 "github.com/club8/pkg-proto/gen/go/club/record/v1"
+	txv1 "github.com/club8/pkg-proto/gen/go/club/tx/v1"
+	"github.com/club8/pkg-game-framework/framework"
+	"github.com/club8/pkg-game-framework/room"
+	fwtest "github.com/club8/pkg-game-framework/testing"
+	"github.com/rs/zerolog"
+)
+
+type noopCtx struct {
+	context.Context
+	tx     txv1.TxServiceClient
+	record recordv1.RecordServiceClient
+}
+
+func (c *noopCtx) TraceID() string                      { return "trace-test" }
+func (c *noopCtx) Logger() zerolog.Logger               { return zerolog.Nop() }
+func (c *noopCtx) Tx() txv1.TxServiceClient             { return c.tx }
+func (c *noopCtx) Record() recordv1.RecordServiceClient { return c.record }
+
+func newCtx() framework.Context {
+	return &noopCtx{
+		Context: context.Background(),
+		tx:      fwtest.NewFakeTx(),
+		record:  fwtest.NewFakeRecord(),
+	}
+}
+
+func TestMeta(t *testing.T) {
+	meta := (&Logic{}).Meta()
+	if meta.GameID != "{{.GameID}}" {
+		t.Fatalf("GameID = %q; want {{.GameID}}", meta.GameID)
+	}
+}
+
+// TestOnSettle_RefundAllStakes 驗證 MVP template 的行為：流局 stakes 原路退回。
+// TODO: 遊戲邏輯實作後，改寫此測試驗證真正的勝負算法。
+func TestOnSettle_RefundAllStakes(t *testing.T) {
+	mgr := room.NewManager(zerolog.Nop())
+	r, _ := mgr.Create("alice", "{{.GameID}}", 100, 3)
+	_, _ = r.Enter("bob")
+	_ = r.PlaceBet("alice", 100)
+	_ = r.PlaceBet("bob", 200)
+	_ = r.Settle()
+
+	payouts, err := (&Logic{}).OnSettle(newCtx(), &gamev1.SettleRequest{RoomId: r.ID}, r)
+	if err != nil {
+		t.Fatalf("OnSettle: %v", err)
+	}
+	if len(payouts) != 2 {
+		t.Fatalf("payouts len=%d; want 2", len(payouts))
+	}
+}

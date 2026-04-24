@@ -1,0 +1,49 @@
+# {{.GameID}} — Club No.8 遊戲服務
+
+以 [`pkg-game-framework`](https://github.com/club8/pkg-game-framework) 為基礎的獨立 repo。
+
+## 快速開始
+
+```bash
+make tidy           # 拉依賴
+make test           # 跑單元測試
+make build          # 編譯本機 binary
+```
+
+對接本機 dev 環境：
+
+1. 在 Club No.8 monorepo 跑 `make infra-up`（起 Consul / ETCD / Postgres）
+2. 同 monorepo 跑 `make run-tx` 與 `make run-record`
+3. 本 repo 跑 `make run`，服務會自動向 Consul 註冊
+
+## 實作你的遊戲邏輯
+
+只改 **`internal/logic/logic.go`**。所有 hook 的契約與生命週期見：
+- [pkg-game-framework docs](https://github.com/club8/pkg-game-framework/blob/main/README.md)
+- monorepo 內的 `docs/game-framework-api.md`
+
+切忌：
+- **不要直接呼叫 Tx 或 Record**（框架會處理）
+- **不要寫 ETCD**（框架內部管）
+- **金流所有動作必須走 Tx**（不要自己開 DB 改錢包）
+
+## 升級依賴
+
+```bash
+go get -u github.com/club8/pkg-proto@v1.0.1
+go get -u github.com/club8/pkg-game-framework@v0.2.0
+go mod tidy
+make test
+```
+
+依賴版本升級的 breaking change 會在對應 CHANGELOG.md 標註。
+
+## 客戶端（Godot）
+
+若你的遊戲需要 Godot 端 UI，使用 `club+app` monorepo 的 scaffold 工具：
+
+```bash
+make -C club+app scaffold-game GAME_ID={{.GameID}}
+```
+
+產出的 `games/{{.GameID}}/main.tscn` 即為本遊戲的客戶端入口。

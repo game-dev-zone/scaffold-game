@@ -1,0 +1,25 @@
+// cmd/game-{{.GameID}} 啟動 {{.GameID}} 遊戲服務。
+// 所有基礎設施（Consul / ETCD / gRPC / Tx / Record）由 framework.Run 處理；
+// 業務邏輯在 internal/logic 中實作 GameLogic interface。
+package main
+
+import (
+	"context"
+	"os"
+
+	"{{.ModulePath}}/internal/logic"
+	"github.com/club8/pkg-game-framework/framework"
+	"github.com/rs/zerolog"
+)
+
+func main() {
+	log := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cfg := framework.LoadFromEnv(framework.Config{})
+	if err := framework.Run(ctx, cfg, &logic.Logic{}); err != nil {
+		log.Fatal().Err(err).Msg("framework.Run")
+	}
+}

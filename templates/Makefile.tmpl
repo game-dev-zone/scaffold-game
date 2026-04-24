@@ -1,0 +1,36 @@
+# {{.GameID}} — Makefile
+
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
+
+GAME_ID := {{.GameID}}
+ADVERTISE_HOST ?= $(shell ipconfig getifaddr en0 2>/dev/null || echo 127.0.0.1)
+
+.PHONY: help
+help: ## 列出所有指令
+	@grep -hE '^[a-zA-Z0-9_.-]+:.*?## ' $(MAKEFILE_LIST) | \
+		awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: tidy
+tidy: ## go mod tidy
+	go mod tidy
+
+.PHONY: lint
+lint: ## go vet
+	go vet ./...
+
+.PHONY: test
+test: ## go test ./...
+	go test ./...
+
+.PHONY: build
+build: ## 編譯為本機 binary
+	go build -o bin/game-$(GAME_ID) ./cmd/game-$(GAME_ID)
+
+.PHONY: run
+run: ## 本機啟動（需先 `make infra-up` 在 Club No.8 monorepo）
+	ADVERTISE_HOST="$(ADVERTISE_HOST)" go run ./cmd/game-$(GAME_ID)
+
+.PHONY: docker-build
+docker-build: ## Build container image
+	docker build -t club8/game-$(GAME_ID):$(shell git rev-parse --short HEAD 2>/dev/null || echo dev) .
