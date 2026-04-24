@@ -1,6 +1,6 @@
 # {{.GameID}} — Club No.8 遊戲服務
 
-以 [`pkg-game-framework`](https://github.com/club8/pkg-game-framework) 為基礎的獨立 repo。
+以 [`pkg-game-framework`](https://github.com/game-dev-zone/pkg-game-framework) 為基礎的獨立 repo。
 
 ## 快速開始
 
@@ -19,7 +19,7 @@ make build          # 編譯本機 binary
 ## 實作你的遊戲邏輯
 
 只改 **`internal/logic/logic.go`**。所有 hook 的契約與生命週期見：
-- [pkg-game-framework docs](https://github.com/club8/pkg-game-framework/blob/main/README.md)
+- [pkg-game-framework docs](https://github.com/game-dev-zone/pkg-game-framework/blob/main/README.md)
 - monorepo 內的 `docs/game-framework-api.md`
 
 切忌：
@@ -30,8 +30,8 @@ make build          # 編譯本機 binary
 ## 升級依賴
 
 ```bash
-go get -u github.com/club8/pkg-proto@v1.0.1
-go get -u github.com/club8/pkg-game-framework@v0.2.0
+go get -u github.com/game-dev-zone/pkg-proto@v1.0.1
+go get -u github.com/game-dev-zone/pkg-game-framework@v0.2.0
 go mod tidy
 make test
 ```

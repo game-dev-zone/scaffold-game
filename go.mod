@@ -1,3 +1,3 @@
-module github.com/club8/scaffold-game
+module github.com/game-dev-zone/scaffold-game
 
 go 1.25.0

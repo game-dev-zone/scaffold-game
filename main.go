@@ -2,7 +2,7 @@
 //
 // 外部協作者不需要 clone 整個 monorepo，只要：
 //
-//	go install github.com/club8/scaffold-game@latest
+//	go install github.com/game-dev-zone/scaffold-game@latest
 //	scaffold-game --game-id=niuniu --module=github.com/acme/club-game-niuniu --out-dir=./club-game-niuniu
 //
 // 或由 monorepo 開發者用 `make scaffold-game GAME_ID=...`。
