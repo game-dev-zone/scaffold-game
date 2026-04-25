@@ -1,0 +1,95 @@
+// cmd/e2e-smoketest 跑一次完整的 alice/bob CreateRoom → Enter → PlaceBet → Settle 流程。
+//
+// 前置：本機 Consul 上要看得到 game-{{.GameID}} 與 tx 兩個服務（healthy）。
+//
+//	go run ./cmd/e2e-smoketest
+//
+// 預期輸出最後一行為 "E2E OK"；任何錯誤會 log.Fatal。
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	commonv1 "github.com/game-dev-zone/pkg-proto/gen/go/club/common/v1"
+	gamev1 "github.com/game-dev-zone/pkg-proto/gen/go/club/game/v1"
+	txv1 "github.com/game-dev-zone/pkg-proto/gen/go/club/tx/v1"
+	"github.com/google/uuid"
+	_ "github.com/mbobakov/grpc-consul-resolver"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+)
+
+const gameID = "{{.GameID}}"
+
+func main() {
+	tx := dial("tx")
+
+	// 先儲值玩家錢包（單次冪等；多次跑 smoketest 用相同 key 不會重複入帳）。
+	_, err := txv1.NewTxServiceClient(tx).Transfer(context.Background(), &txv1.TransferRequest{
+		IdempotencyKey: "seed-" + gameID + "-" + uuid.NewString(),
+		Entries: []*txv1.TxEntry{
+			{UserId: "alice", Type: txv1.TxType_TX_TYPE_DEPOSIT, Amount: 5000},
+			{UserId: "bob", Type: txv1.TxType_TX_TYPE_DEPOSIT, Amount: 3000},
+		},
+	})
+	must(err, "seed deposit")
+
+	game := dial("game-" + gameID)
+	gc := gamev1.NewGameServiceClient(game)
+
+	cr, err := gc.CreateRoom(context.Background(), &gamev1.CreateRoomRequest{
+		UserId: "alice", GameId: gameID, Ante: 100, MaxSeats: 3, OwnerStake: 1000,
+	})
+	must(err, "CreateRoom")
+	fmt.Printf("CreateRoom: ack=%v room=%s\n", cr.Ack.Code, cr.RoomId)
+
+	er, err := gc.EnterRoom(context.Background(), &gamev1.EnterRoomRequest{
+		UserId: "bob", RoomId: cr.RoomId,
+	})
+	must(err, "EnterRoom")
+	fmt.Printf("EnterRoom bob: ack=%v seats=%d\n", er.Ack.Code, len(er.Snapshot.Seats))
+
+	pb, err := gc.PlaceBet(context.Background(), &gamev1.PlaceBetRequest{
+		UserId: "bob", RoomId: cr.RoomId, Amount: 200,
+	})
+	must(err, "PlaceBet")
+	fmt.Printf("PlaceBet bob: ack=%v new_balance=%d\n", pb.Ack.Code, pb.NewBalance)
+
+	gb, _ := txv1.NewTxServiceClient(tx).GetBalance(context.Background(), &txv1.GetBalanceRequest{UserId: "alice"})
+	fmt.Printf("alice wallet: balance=%d frozen=%d\n", gb.Wallet.Balance, gb.Wallet.Frozen)
+
+	time.Sleep(100 * time.Millisecond)
+	st, err := gc.Settle(context.Background(), &gamev1.SettleRequest{RoomId: cr.RoomId})
+	must(err, "Settle")
+	fmt.Printf("Settle: ack=%v payouts=%d\n", st.Ack.Code, len(st.Payouts))
+	for _, p := range st.Payouts {
+		fmt.Printf("  payout: %s delta=%d reason=%s\n", p.UserId, p.Delta, p.Reason)
+	}
+
+	if st.Ack.Code != commonv1.ErrorCode_ERROR_CODE_OK {
+		log.Fatalf("settle failed: %v", st.Ack)
+	}
+
+	ga, _ := txv1.NewTxServiceClient(tx).GetBalance(context.Background(), &txv1.GetBalanceRequest{UserId: "bob"})
+	fmt.Printf("bob wallet after settle: balance=%d frozen=%d\n", ga.Wallet.Balance, ga.Wallet.Frozen)
+	fmt.Println("E2E OK")
+}
+
+func dial(name string) *grpc.ClientConn {
+	cc, err := grpc.NewClient(
+		fmt.Sprintf("consul://127.0.0.1:8500/%s?wait=14s&healthy=true&tag=v1", name),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}]}`),
+	)
+	must(err, "dial "+name)
+	return cc
+}
+
+func must(err error, msg string) {
+	if err != nil {
+		log.Fatalf("%s: %v", msg, err)
+	}
+}

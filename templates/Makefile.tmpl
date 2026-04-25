@@ -31,6 +31,10 @@ build: ## 編譯為本機 binary
 run: ## 本機啟動（需先 `make infra-up` 在 Club No.8 monorepo）
 	ADVERTISE_HOST="$(ADVERTISE_HOST)" go run ./cmd/game-$(GAME_ID)
 
+.PHONY: e2e
+e2e: ## 跑端到端 smoketest（需 tx + game-$(GAME_ID) 兩服務都健康註冊在 Consul）
+	go run ./cmd/e2e-smoketest
+
 .PHONY: docker-build
 docker-build: ## Build container image
 	docker build -t club8/game-$(GAME_ID):$(shell git rev-parse --short HEAD 2>/dev/null || echo dev) .
