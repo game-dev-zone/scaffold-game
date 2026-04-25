@@ -33,7 +33,7 @@ func newCtx() framework.Context {
 }
 
 func TestMeta(t *testing.T) {
-	meta := (&Logic{}).Meta()
+	meta := NewLogic().Meta()
 	if meta.GameID != "{{.GameID}}" {
 		t.Fatalf("GameID = %q; want {{.GameID}}", meta.GameID)
 	}
@@ -49,7 +49,7 @@ func TestOnSettle_RefundAllStakes(t *testing.T) {
 	_ = r.PlaceBet("bob", 200)
 	_ = r.Settle()
 
-	payouts, err := (&Logic{}).OnSettle(newCtx(), &gamev1.SettleRequest{RoomId: r.ID}, r)
+	payouts, err := NewLogic().OnSettle(newCtx(), &gamev1.SettleRequest{RoomId: r.ID}, r)
 	if err != nil {
 		t.Fatalf("OnSettle: %v", err)
 	}

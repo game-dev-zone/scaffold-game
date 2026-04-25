@@ -19,7 +19,7 @@ func main() {
 	defer cancel()
 
 	cfg := framework.LoadFromEnv(framework.Config{})
-	if err := framework.Run(ctx, cfg, &logic.Logic{}); err != nil {
+	if err := framework.Run(ctx, cfg, logic.NewLogic()); err != nil {
 		log.Fatal().Err(err).Msg("framework.Run")
 	}
 }

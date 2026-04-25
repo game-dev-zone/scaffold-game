@@ -18,8 +18,15 @@ import (
 )
 
 // Logic 實作 framework.GameLogic。
-// TODO: 加上你自己需要的欄位（如 RNG seed、規則表、外部服務 client）。
+// TODO: 加上你自己需要的欄位（如 RNG seed、規則表、外部服務 client）；
+// 加欄位後在 NewLogic() 中初始化即可，不必動 cmd/main.go。
 type Logic struct{}
+
+// NewLogic 是建議的建構式：未來加 state（rng / 設定 / DB pool）時，
+// 把 init 集中在這裡，main.go 永遠 logic.NewLogic() 不需改。
+func NewLogic() *Logic {
+	return &Logic{}
+}
 
 func (l *Logic) Meta() framework.GameMeta {
 	return framework.GameMeta{
